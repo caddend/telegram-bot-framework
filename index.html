@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Чат с ботом</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .chat-container {
+      width: 100%;
+      max-width: 480px;
+      height: 90vh;
+      background: #1e293b;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .chat-header {
+      padding: 16px;
+      background: #334155;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #22c55e;
+    }
+    .messages-list {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .message {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 14px;
+      font-size: 14px;
+      line-height: 1.4;
+      word-wrap: break-word;
+    }
+    .message.user {
+      align-self: flex-end;
+      background: #2563eb;
+      color: #fff;
+      border-bottom-right-radius: 2px;
+    }
+    .message.bot {
+      align-self: flex-start;
+      background: #334155;
+      color: #f1f5f9;
+      border-bottom-left-radius: 2px;
+    }
+    .message-meta {
+      font-size: 10px;
+      opacity: 0.7;
+      margin-top: 4px;
+      text-align: right;
+    }
+    .chat-form {
+      display: flex;
+      padding: 12px;
+      background: #0f172a;
+      gap: 8px;
+    }
+    .chat-input {
+      flex: 1;
+      background: #1e293b;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #f8fafc;
+      font-size: 14px;
+      outline: none;
+    }
+    .chat-input:focus { border-color: #3b82f6; }
+    .send-btn {
+      background: #2563eb;
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      padding: 0 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .send-btn:hover { background: #1d4ed8; }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="chat-header">
+      <div class="status-dot"></div>
+      <div>EchoBot (Локальный сервер)</div>
+    </div>
+    <div class="messages-list" id="messagesList"></div>
+    <form class="chat-form" id="chatForm">
+      <input type="text" id="msgInput" class="chat-input" placeholder="Введите сообщение..." autocomplete="off">
+      <button type="submit" class="send-btn">Отправить</button>
+    </form>
+  </div>
+
+  <script>
+    const messagesList = document.getElementById('messagesList');
+    const chatForm = document.getElementById('chatForm');
+    const msgInput = document.getElementById('msgInput');
+    let renderedCount = 0;
+
+    function formatTime(timestamp) {
+      const date = new Date(timestamp * 1000);
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function appendMessage(msg) {
+      const isBot = Boolean(msg.from && msg.from.is_bot);
+      const msgEl = document.createElement('div');
+      msgEl.className = `message ${isBot ? 'bot' : 'user'}`;
+
+      const textNode = document.createElement('div');
+      textNode.textContent = msg.text || '';
+
+      const metaNode = document.createElement('div');
+      metaNode.className = 'message-meta';
+      metaNode.textContent = `${isBot ? 'Бот' : 'Вы'} • ${formatTime(msg.date)}`;
+
+      msgEl.appendChild(textNode);
+      msgEl.appendChild(metaNode);
+      messagesList.appendChild(msgEl);
+    }
+
+    async function loadMessages() {
+      try {
+        const res = await fetch('/api/messages');
+        if (!res.ok) return;
+        const data = await res.json();
+        const messages = data.messages || [];
+
+        if (messages.length > renderedCount) {
+          for (let i = renderedCount; i < messages.length; i++) {
+            appendMessage(messages[i]);
+          }
+          renderedCount = messages.length;
+          messagesList.scrollTop = messagesList.scrollHeight;
+        }
+      } catch (err) {
+        // Ошибки соединения игнорируются для фонового опроса
+      }
+    }
+
+    chatForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = msgInput.value.trim();
+      if (!text) return;
+
+      msgInput.value = '';
+      try {
+        await fetch('/api/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: 1001, text })
+        });
+        await loadMessages();
+      } catch (err) {
+        console.error('Ошибка отправки:', err);
+      }
+    });
+
+    loadMessages();
+    setInterval(loadMessages, 1000);
+  </script>
+</body>
+</html>
